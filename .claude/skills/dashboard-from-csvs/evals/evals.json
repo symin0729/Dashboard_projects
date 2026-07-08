@@ -1,0 +1,41 @@
+{
+  "skill_name": "dashboard-from-csvs",
+  "evals": [
+    {
+      "id": 0,
+      "name": "eval-marketing-dashboard",
+      "prompt": "I have two CSVs in this folder — ad_spend.csv (campaign_id, channel, spend_usd, month) and conversions.csv (lead_id, campaign_id, deal_value_usd, closed_date). Build me a simple dashboard I can just open in a browser that shows which channel drives the most revenue per dollar spent, plus a list of the top 15 highest-value deals.",
+      "expected_output": "A pandas-based aggregate.py plus a single self-contained index.html. The script normalizes the 'Search, Branded' vs 'Search' vs 'SOCIAL' casing/naming variants before grouping by channel, computes a standardized index (not a raw ratio, since spend and deal value differ in scale) for channels present in both files, and keeps Podcast (spend-only, no conversions) visible with a null/no-data indicator rather than dropping it. The top-15 table is sorted by deal value. No raw CSVs referenced/embedded beyond the aggregated JSON.",
+      "files": ["ad_spend.csv", "conversions.csv"],
+      "expectations": [
+        "aggregate.py exists and uses pandas (or an equivalent real CSV parser) rather than manual comma-splitting",
+        "aggregate.py runs successfully and prints valid JSON to stdout",
+        "The 'Search, Branded', 'Search', and 'SOCIAL' channel-name variants are normalized into consistent categories rather than left as separate near-duplicate entries",
+        "index.html is a single self-contained file with the data embedded directly (no separate data file or server required to view it)",
+        "The Podcast channel (spend-only, no matching conversions) appears in the output with a clear no-data indicator rather than being silently dropped",
+        "The spend-vs-revenue comparison uses a standardized/index approach rather than a raw ratio, given the two totals differ by roughly two orders of magnitude",
+        "A top-15 (or reasonably close to 15) table of highest-value deals is present",
+        "Raw CSVs (ad_spend.csv, conversions.csv) are not embedded into index.html, and are excluded via .gitignore if a git repo was set up",
+        "No git, gh, or deployment commands were actually executed (scope compliance for this sandboxed eval)"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "eval-hr-training-dashboard",
+      "prompt": "We have training_hours.csv (employee_id, department, hours_completed, program_name) and performance_scores.csv (employee_id, review_score, review_quarter) in this folder. Management wants a static page showing whether training hours correlate with performance scores by department, plus a top-20 list of employees by training hours completed.",
+      "expected_output": "A pandas-based aggregate.py plus a single self-contained index.html, joining on employee_id. Normalizes 'ENGINEERING' vs 'Engineering'. Support department (training data only, zero performance-score matches) is kept visible with a no-data indicator rather than dropped. Because this is employee performance data, the output should include some plain-language correlation-not-causation framing given management could misuse a department-level correlation. Raw CSVs are not committed/embedded — only the aggregated JSON.",
+      "files": ["training_hours.csv", "performance_scores.csv"],
+      "expectations": [
+        "aggregate.py exists and uses pandas to read and join the CSVs on employee_id",
+        "aggregate.py runs successfully and prints valid JSON to stdout",
+        "'ENGINEERING' and 'Engineering' are normalized into a single department category",
+        "index.html is a single self-contained file with the data embedded directly",
+        "The Support department (training data only, zero performance-score matches) appears in the output with a clear no-data indicator rather than being dropped",
+        "A top-20 (or reasonably close to 20) table of employees by training hours is present",
+        "Given this is employee performance data, the output includes plain-language correlation-not-causation framing or similar caution about the department-level comparison",
+        "Raw CSVs (training_hours.csv, performance_scores.csv) are not embedded into index.html, and are excluded via .gitignore if a git repo was set up",
+        "No git, gh, or deployment commands were actually executed (scope compliance for this sandboxed eval)"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DASHBOARD_TITLE</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#16213a; --text:#e2e8f0; --muted:#94a3b8;
+    --accent:#38bdf8; --good:#34d399; --warn:#fbbf24; --bad:#f87171; --border:#2d3b52;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.5;}
+  header{padding:24px 32px; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#111c33,#0f172a);}
+  header h1{margin:0 0 6px; font-size:22px; font-weight:700;}
+  header p{margin:0; color:var(--muted); font-size:13px;}
+  .container{max-width:1180px; margin:0 auto; padding:24px 32px 60px;}
+
+  /* If the data has any regulatory/compliance weight (payments, health, HR, PII),
+     uncomment this block and write the actual disclaimer text — see SKILL.md Step 3.
+  .disclaimer{
+    background:#1c2841; border:1px solid #2f4270; border-left:4px solid var(--accent);
+    padding:14px 18px; border-radius:8px; font-size:13px; color:var(--muted); margin-bottom:24px;
+  }
+  .disclaimer b{color:var(--text);}
+  */
+
+  .stats-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:28px;}
+  .stat-card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px;}
+  .stat-card .label{font-size:12px; color:var(--muted); margin-bottom:6px;}
+  .stat-card .value{font-size:22px; font-weight:700;}
+  .stat-card .sub{font-size:11px; color:var(--muted); margin-top:4px;}
+  section{margin-bottom:32px;}
+  section h2{font-size:16px; margin:0 0 14px; padding-bottom:8px; border-bottom:1px solid var(--border);}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:20px;}
+  .filter-row{display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap;}
+  select{background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:13px; min-width:220px;}
+  .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600;}
+  .badge-yes{background:rgba(52,211,153,0.15); color:var(--good);}
+  .badge-no{background:rgba(148,163,184,0.15); color:var(--muted);}
+  .detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:18px;}
+  .detail-item .label{font-size:12px; color:var(--muted);}
+  .detail-item .value{font-size:20px; font-weight:700; margin-top:2px;}
+  .no-data-msg{background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:#fca5a5; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:14px;}
+  canvas{max-height:340px;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th,td{padding:9px 10px; text-align:left; border-bottom:1px solid var(--border);}
+  th{color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em;}
+  tbody tr:hover{background:rgba(255,255,255,0.03);}
+  .num{text-align:right; font-variant-numeric:tabular-nums;}
+  footer{padding:24px 32px; color:var(--muted); font-size:11px; border-top:1px solid var(--border); text-align:center;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DASHBOARD_TITLE</h1>
+  <p>DASHBOARD_SUBTITLE — e.g. "DATASET_A x DATASET_B · joined on JOIN_KEY · static analysis"</p>
+</header>
+
+<div class="container">
+
+  <!-- Uncomment and fill in if this data needs a correlation/compliance disclaimer.
+  <div class="disclaimer">
+    <b>Note.</b> DISCLAIMER_TEXT — e.g. this index is correlational, not causal, and should not be used to imply X causes Y.
+  </div>
+  -->
+
+  <section>
+    <h2>Overview</h2>
+    <div class="stats-grid" id="statsGrid"></div>
+  </section>
+
+  <section>
+    <h2>By category</h2>
+    <div class="panel">
+      <div class="filter-row">
+        <label for="categorySelect" style="font-size:13px;color:var(--muted);">Category</label>
+        <select id="categorySelect"></select>
+      </div>
+      <div id="noDataMsg" class="no-data-msg" style="display:none;">
+        This category has no matching data in the other dataset — showing side-A metrics only.
+      </div>
+      <div class="detail-grid" id="detailGrid"></div>
+      <canvas id="categoryChart"></canvas>
+    </div>
+  </section>
+
+  <section>
+    <h2>Top N</h2>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Name</th><th class="num">Metric</th><th>Matched</th><th class="num">Matched value</th>
+          </tr>
+        </thead>
+        <tbody id="topTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<footer>Data source: DATA_SOURCE_NOTE · static data, manually refreshed</footer>
+
+<script>
+// Paste the aggregate.py output here, replacing this placeholder object.
+// Shape must match references/aggregate_pattern.py's output: {overall, categories, top_n}
+const DATA = {"overall": {}, "categories": [], "top_n": []};
+
+function fmtNum(n){
+  if(n===null||n===undefined) return '—';
+  return Number(n).toLocaleString('en-US');
+}
+function fmtUSD(n){
+  if(n===null||n===undefined) return '—';
+  return '$' + Number(n).toLocaleString('en-US',{maximumFractionDigits:0});
+}
+
+// ---- Overview stat cards ----
+// Replace this list with the actual fields in your `overall` block.
+const o = DATA.overall;
+const statCards = [
+  {label:'Dataset A rows', value: fmtNum(o.a_rows), sub: o.a_unique_keys + ' unique keys'},
+  {label:'Dataset B rows', value: fmtNum(o.b_rows), sub: o.b_unique_keys + ' unique keys'},
+  {label:'Key overlap', value: fmtNum(o.overlap_keys), sub: 'shared join keys'},
+];
+document.getElementById('statsGrid').innerHTML = statCards.map(c => `
+  <div class="stat-card">
+    <div class="label">${c.label}</div>
+    <div class="value">${c.value}</div>
+    <div class="sub">${c.sub}</div>
+  </div>`).join('');
+
+// ---- Category filter + chart ----
+const select = document.getElementById('categorySelect');
+DATA.categories.forEach(c => {
+  const opt = document.createElement('option');
+  opt.value = c.category;
+  opt.textContent = c.category + (c.index_vs_avg!==null && c.index_vs_avg!==undefined ? ' (matched)' : '');
+  select.appendChild(opt);
+});
+
+let chart;
+function renderCategory(name){
+  const c = DATA.categories.find(x => x.category === name);
+  const hasMatch = c.index_vs_avg !== null && c.index_vs_avg !== undefined;
+  document.getElementById('noDataMsg').style.display = hasMatch ? 'none' : 'block';
+
+  let items = [
+    {label:'Total (A)', value: fmtNum(c.total_METRIC)},
+    {label:'Count', value: fmtNum(c.count)},
+  ];
+  if(hasMatch){
+    items.push({label:'Index vs. average', value: c.index_vs_avg.toFixed(2)});
+  }
+  document.getElementById('detailGrid').innerHTML = items.map(i => `
+    <div class="detail-item">
+      <div class="label">${i.label}</div>
+      <div class="value">${i.value}</div>
+    </div>`).join('');
+
+  const ctx = document.getElementById('categoryChart');
+  const comparable = DATA.categories.filter(x => x.index_vs_avg !== null && x.index_vs_avg !== undefined);
+  const colors = comparable.map(x => x.category === name ? '#38bdf8' : '#334561');
+
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: comparable.map(x => x.category),
+      datasets:[{ label:'Index vs. average', data: comparable.map(x => x.index_vs_avg), backgroundColor: colors, borderRadius:4 }]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{ticks:{color:'#94a3b8'}, grid:{color:'#2d3b52'}}, y:{ticks:{color:'#94a3b8'}, grid:{color:'#2d3b52'}} }
+    }
+  });
+}
+select.addEventListener('change', e => renderCategory(e.target.value));
+if(DATA.categories.length) renderCategory(DATA.categories[0].category);
+
+// ---- Top N table ----
+const tbody = document.getElementById('topTableBody');
+tbody.innerHTML = DATA.top_n.map((row, i) => `
+  <tr>
+    <td>${i+1}</td>
+    <td>NAME_FIELDS_HERE</td>
+    <td class="num">${fmtNum(row.total_METRIC)}</td>
+    <td>${row.has_match_in_b ? '<span class="badge badge-yes">matched</span>' : '<span class="badge badge-no">no match</span>'}</td>
+    <td class="num">${row.has_match_in_b ? fmtNum(row.matched_METRIC) : '—'}</td>
+  </tr>`).join('');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대시보드는 어떻게 만들어졌나</title>
+<style>
+  :root{
+    --bg:#f4f6fb;
+    --surface:#ffffff;
+    --surface-2:#eef1f8;
+    --border:#d8deec;
+    --text:#131b2e;
+    --muted:#5b6785;
+    --accent-data:#0b7d94;
+    --accent-web:#6d4fc4;
+    --accent-live:#0f8f5f;
+    --accent-warn:#a2590a;
+    --code-bg:#eef1f8;
+    --shadow:0 1px 2px rgba(20,30,60,0.06), 0 10px 26px rgba(20,30,60,0.07);
+    --font-display:"Segoe UI Semibold","Segoe UI",-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --font-body:"Segoe UI",-apple-system,"Helvetica Neue",Arial,sans-serif;
+    --font-mono:"Cascadia Code","Consolas","SF Mono",ui-monospace,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0a0f1e;
+      --surface:#121a2e;
+      --surface-2:#182342;
+      --border:#293152;
+      --text:#e7ecf5;
+      --muted:#93a0bd;
+      --accent-data:#38bdf8;
+      --accent-web:#b3a1f2;
+      --accent-live:#3ddc9a;
+      --accent-warn:#fbbf24;
+      --code-bg:#0e1730;
+      --shadow:0 1px 2px rgba(0,0,0,0.35), 0 14px 30px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a0f1e;
+    --surface:#121a2e;
+    --surface-2:#182342;
+    --border:#293152;
+    --text:#e7ecf5;
+    --muted:#93a0bd;
+    --accent-data:#38bdf8;
+    --accent-web:#b3a1f2;
+    --accent-live:#3ddc9a;
+    --accent-warn:#fbbf24;
+    --code-bg:#0e1730;
+    --shadow:0 1px 2px rgba(0,0,0,0.35), 0 14px 30px rgba(0,0,0,0.4);
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb;
+    --surface:#ffffff;
+    --surface-2:#eef1f8;
+    --border:#d8deec;
+    --text:#131b2e;
+    --muted:#5b6785;
+    --accent-data:#0b7d94;
+    --accent-web:#6d4fc4;
+    --accent-live:#0f8f5f;
+    --accent-warn:#a2590a;
+    --code-bg:#eef1f8;
+    --shadow:0 1px 2px rgba(20,30,60,0.06), 0 10px 26px rgba(20,30,60,0.07);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);}
+  .page{max-width:1040px;margin:0 auto;padding:48px 28px 80px;}
+
+  .eyebrow{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;color:var(--muted);
+    text-transform:uppercase;margin:0 0 10px;
+  }
+  h1{
+    font-family:var(--font-display);font-weight:700;font-size:clamp(24px,3.4vw,32px);
+    letter-spacing:-0.01em;line-height:1.25;text-wrap:balance;margin:0 0 12px;
+  }
+  .lede{font-size:16px;line-height:1.65;color:var(--muted);max-width:62ch;margin:0;}
+
+  section{margin-top:52px;}
+  h2{
+    font-family:var(--font-display);font-weight:700;font-size:19px;margin:0 0 6px;
+    display:flex;align-items:baseline;gap:10px;
+  }
+  h2 .step-no{
+    font-family:var(--font-mono);font-size:13px;color:var(--muted);font-weight:600;
+  }
+  .section-sub{font-size:14px;color:var(--muted);margin:0 0 20px;max-width:64ch;line-height:1.6;}
+
+  .legend{
+    display:flex;flex-wrap:wrap;gap:18px;margin-bottom:22px;padding:12px 16px;
+    background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  }
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+
+  .diagram-scroll{
+    overflow-x:auto;background:var(--surface);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:8px;
+  }
+  .diagram-scroll svg{display:block;height:auto;}
+
+  .node{
+    height:100%;display:flex;flex-direction:column;justify-content:center;gap:5px;
+    padding:10px 14px;border-radius:10px;background:var(--surface-2);
+    border:1.5px solid var(--border);font-family:var(--font-body);
+  }
+  .node-title{font-weight:700;font-size:13.5px;line-height:1.3;}
+  .node-mono{font-family:var(--font-mono);font-size:11px;color:var(--muted);line-height:1.5;}
+  .node-note{font-size:10.5px;color:var(--muted);line-height:1.4;}
+  .badge{
+    display:inline-block;margin-top:2px;font-size:10px;font-weight:600;padding:2px 7px;
+    border-radius:999px;width:fit-content;letter-spacing:.01em;
+  }
+  .badge-muted{background:var(--border);color:var(--muted);}
+  .badge-data{background:color-mix(in srgb, var(--accent-data) 16%, transparent);color:var(--accent-data);}
+  .badge-web{background:color-mix(in srgb, var(--accent-web) 16%, transparent);color:var(--accent-web);}
+  .badge-live{background:color-mix(in srgb, var(--accent-live) 18%, transparent);color:var(--accent-live);}
+
+  .node-data{border-color:color-mix(in srgb, var(--accent-data) 45%, var(--border));}
+  .node-web{border-color:color-mix(in srgb, var(--accent-web) 45%, var(--border));}
+  .node-live{border-color:color-mix(in srgb, var(--accent-live) 45%, var(--border));}
+
+  .lbl{font-family:var(--font-body);font-size:11.5px;fill:var(--muted);text-anchor:middle;}
+  .lbl-warn{font-family:var(--font-body);font-size:11.5px;font-weight:700;fill:var(--accent-warn);text-anchor:middle;}
+  .arrow{stroke:var(--muted);stroke-width:1.6;fill:none;}
+  .arrow-warn{stroke:var(--accent-warn);stroke-width:1.8;fill:none;stroke-dasharray:5 4;}
+
+  .connector{
+    display:flex;align-items:center;gap:14px;justify-content:center;margin:18px 0;
+    color:var(--muted);font-size:13px;
+  }
+  .connector svg{flex:none;}
+
+  .filelist{display:flex;flex-direction:column;gap:12px;}
+  .filecard{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);border-left:3px solid var(--border);overflow:hidden;
+  }
+  .filecard.data{border-left-color:var(--accent-data);}
+  .filecard.web{border-left-color:var(--accent-web);}
+  .filecard summary{
+    cursor:pointer;list-style:none;padding:15px 20px;display:flex;
+    align-items:center;gap:12px;
+  }
+  .filecard summary::-webkit-details-marker{display:none;}
+  .filecard summary .chev{flex:none;color:var(--muted);}
+  @media (prefers-reduced-motion: no-preference){
+    .filecard summary .chev{transition:transform .16s ease;}
+  }
+  .filecard[open] summary .chev{transform:rotate(90deg);}
+  .filecard summary .fname{font-family:var(--font-mono);font-weight:700;font-size:14px;white-space:nowrap;}
+  .filecard summary .fdesc{font-size:13px;color:var(--muted);line-height:1.4;}
+  .filecard .fbody{padding:2px 20px 20px 20px;border-top:1px solid var(--border);}
+  .filecard .fbody-inner{padding-top:14px;}
+
+  .outline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
+  .outline > li{padding-left:14px;border-left:2px solid var(--border);}
+  .outline .tag{
+    font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text);
+    background:var(--code-bg);padding:1px 7px;border-radius:5px;margin-right:7px;
+    white-space:nowrap;
+  }
+  .outline .otxt{font-size:13px;color:var(--muted);line-height:1.55;}
+  .outline .nested{
+    list-style:none;margin:8px 0 0;padding-left:14px;border-left:1px dashed var(--border);
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .outline .step,
+  .step{
+    display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;
+    border-radius:4px;background:var(--surface-2);color:var(--muted);font-family:var(--font-mono);
+    font-size:10px;font-weight:700;margin-right:7px;flex:none;
+  }
+
+  .codesteps{display:flex;flex-direction:column;gap:16px;margin:4px 0 0;}
+  .codestep-label{font-size:13px;color:var(--text);line-height:1.5;display:flex;align-items:flex-start;}
+  .codestep-label .step{margin-top:2px;}
+  pre.code{
+    margin:8px 0 0;padding:12px 14px;background:var(--code-bg);border:1px solid var(--border);
+    border-radius:8px;overflow-x:auto;
+  }
+  pre.code code{font-family:var(--font-mono);font-size:12px;line-height:1.65;color:var(--text);white-space:pre;}
+  .headtree{list-style:none;margin:0;padding:0;font-family:var(--font-mono);font-size:12.5px;line-height:2;color:var(--text);}
+  .headtree .h2{padding-left:0;font-weight:700;}
+  .headtree .h3{padding-left:22px;color:var(--muted);}
+
+  .callout{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:22px 24px;box-shadow:var(--shadow);
+  }
+  .callout h3{font-family:var(--font-display);font-size:16px;margin:0 0 10px;}
+  .callout p{font-size:14px;line-height:1.65;color:var(--text);margin:0 0 14px;}
+  .callout p:last-child{margin-bottom:0;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;}
+  td{color:var(--text);}
+  .cell-yes{color:var(--accent-live);font-weight:700;}
+  .cell-no{color:var(--accent-warn);font-weight:700;}
+  .table-wrap{overflow-x:auto;}
+
+  footer{
+    margin-top:56px;padding-top:22px;border-top:1px solid var(--border);
+    font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 18px;
+  }
+  a{color:var(--accent-web);text-decoration:none;border-bottom:1px solid color-mix(in srgb, var(--accent-web) 40%, transparent);}
+  a:hover{border-bottom-color:var(--accent-web);}
+  a:focus-visible{outline:2px solid var(--accent-web);outline-offset:2px;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <p class="eyebrow">지급-처방 상관관계 대시보드 · 아키텍처 노트</p>
+  <h1>파일 6개가 어떻게 라이브 사이트가 되는가</h1>
+  <p class="lede">
+    이 프로젝트에는 빌드 도구도 서버도 없습니다. 데이터를 준비하는 파이썬 스크립트 하나와,
+    그 결과가 통째로 박혀 있는 HTML 파일 하나가 전부입니다. 아래는 CSV 파일에서 시작해
+    지금 보고 계신 라이브 페이지까지 이어지는 두 단계를 그린 것입니다.
+  </p>
+
+  <div class="legend">
+    <div class="legend-item"><span class="dot" style="background:var(--accent-data)"></span>데이터 · 파이썬 단계</div>
+    <div class="legend-item"><span class="dot" style="background:var(--accent-web)"></span>코드 · 웹 파일 단계</div>
+    <div class="legend-item"><span class="dot" style="background:var(--accent-live)"></span>배포 완료 · 실제 화면</div>
+    <div class="legend-item"><span class="dot" style="background:var(--accent-warn)"></span>사람이 손으로 하는 단계</div>
+  </div>
+
+  <section>
+    <h2><span class="step-no">01</span> 데이터 준비 — 내 컴퓨터에서 한 번만</h2>
+    <p class="section-sub">
+      원본 CSV 두 개는 저장소에 절대 올라가지 않습니다(.gitignore). <code style="font-family:var(--font-mono)">aggregate.py</code>가
+      이 둘을 읽어 계산한 결과를 화면에 JSON으로 찍어내고, 그걸 사람이 직접 복사해서 붙여넣습니다 — 자동화되어 있지 않은 유일한 구간입니다.
+    </p>
+    <div class="diagram-scroll">
+      <svg viewBox="0 0 1180 168" width="1180" role="img" aria-label="데이터 준비 단계 다이어그램">
+        <defs>
+          <marker id="arrow1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrow" style="fill:var(--muted);stroke:none;"/>
+          </marker>
+          <marker id="arrowWarn1" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent-warn);stroke:none;"/>
+          </marker>
+        </defs>
+
+        <text x="250" y="34" class="lbl">python aggregate.py</text>
+        <text x="250" y="48" class="lbl">실행</text>
+        <line x1="210" y1="95" x2="290" y2="95" class="arrow" marker-end="url(#arrow1)"/>
+
+        <text x="500" y="34" class="lbl">계산 결과를 표준출력으로</text>
+        <text x="500" y="48" class="lbl">JSON으로 출력</text>
+        <line x1="460" y1="95" x2="540" y2="95" class="arrow" marker-end="url(#arrow1)"/>
+
+        <text x="740" y="30" class="lbl-warn">사람이 직접</text>
+        <text x="740" y="44" class="lbl-warn">복사 · 붙여넣기</text>
+        <line x1="690" y1="95" x2="790" y2="95" class="arrow-warn" marker-end="url(#arrowWarn1)"/>
+
+        <foreignObject x="20" y="60" width="190" height="70">
+          <div class="node node-data">
+            <div class="node-title">원본 CSV 2개</div>
+            <div class="node-mono">open_payments.csv<br>part_d_prescriber.csv</div>
+            <span class="badge badge-muted">저장소에 없음</span>
+          </div>
+        </foreignObject>
+
+        <foreignObject x="290" y="60" width="170" height="70">
+          <div class="node node-data">
+            <div class="node-title">aggregate.py</div>
+            <div class="node-mono">Python + pandas</div>
+            <span class="badge badge-data">로컬 1회 실행</span>
+          </div>
+        </foreignObject>
+
+        <foreignObject x="540" y="60" width="150" height="70">
+          <div class="node node-data">
+            <div class="node-title">집계 결과</div>
+            <div class="node-mono">JSON (파일 저장 안 함)</div>
+          </div>
+        </foreignObject>
+
+        <foreignObject x="790" y="60" width="230" height="70">
+          <div class="node node-web">
+            <div class="node-title">index.html 안의 DATA</div>
+            <div class="node-mono">const DATA = {…}</div>
+            <span class="badge badge-web">실제 배포되는 코드</span>
+          </div>
+        </foreignObject>
+      </svg>
+    </div>
+  </section>
+
+  <div class="connector">
+    <svg width="22" height="34" viewBox="0 0 22 34" aria-hidden="true">
+      <line x1="11" y1="0" x2="11" y2="24" style="stroke:var(--muted);stroke-width:1.6;"/>
+      <path d="M3,20 L11,30 L19,20" style="fill:none;stroke:var(--muted);stroke-width:1.6;"/>
+    </svg>
+    <span>DATA가 채워진 <strong style="color:var(--text)">index.html 파일 그 자체</strong>를 그대로 저장소에 올립니다</span>
+  </div>
+
+  <section style="margin-top:0;">
+    <h2><span class="step-no">02</span> 배포 — GitHub Pages</h2>
+    <p class="section-sub">
+      여기부터는 사람이 다시 손댈 일이 없습니다. push 한 번이면 GitHub가 알아서 정적 사이트로 빌드해
+      URL을 내어줍니다.
+    </p>
+    <div class="diagram-scroll">
+      <svg viewBox="0 0 1180 168" width="1180" role="img" aria-label="배포 단계 다이어그램">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted);stroke:none;"/>
+          </marker>
+        </defs>
+
+        <text x="270" y="34" class="lbl">git add · commit</text>
+        <text x="270" y="48" class="lbl">· push</text>
+        <line x1="230" y1="95" x2="310" y2="95" class="arrow" marker-end="url(#arrow2)"/>
+
+        <text x="580" y="34" class="lbl">저장소 설정에서</text>
+        <text x="580" y="48" class="lbl">자동으로 Pages 빌드</text>
+        <line x1="540" y1="95" x2="620" y2="95" class="arrow" marker-end="url(#arrow2)"/>
+
+        <text x="850" y="34" class="lbl">빌드 완료 후</text>
+        <text x="850" y="48" class="lbl">몇 분 내 반영</text>
+        <line x1="810" y1="95" x2="890" y2="95" class="arrow" marker-end="url(#arrow2)"/>
+
+        <foreignObject x="20" y="60" width="210" height="70">
+          <div class="node node-web">
+            <div class="node-title">완성된 프로젝트 파일</div>
+            <div class="node-mono">index.html, README.md, CLAUDE.md…</div>
+          </div>
+        </foreignObject>
+
+        <foreignObject x="310" y="60" width="230" height="70">
+          <div class="node node-web">
+            <div class="node-title">GitHub 저장소</div>
+            <div class="node-mono">symin0729/Dashboard_projects</div>
+            <span class="badge badge-web">원격 저장소</span>
+          </div>
+        </foreignObject>
+
+        <foreignObject x="620" y="60" width="190" height="70">
+          <div class="node node-web">
+            <div class="node-title">GitHub Pages 빌드</div>
+            <div class="node-mono">status: built</div>
+          </div>
+        </foreignObject>
+
+        <foreignObject x="890" y="60" width="260" height="70">
+          <div class="node node-live">
+            <div class="node-title">라이브 사이트 (브라우저)</div>
+            <div class="node-mono">symin0729.github.io/Dashboard_projects</div>
+            <span class="badge badge-live">사용자가 보는 화면</span>
+          </div>
+        </foreignObject>
+      </svg>
+    </div>
+    <p class="section-sub" style="margin-top:16px;">
+      마지막 박스 안에서 실제로 일어나는 일: 브라우저가 <code style="font-family:var(--font-mono)">index.html</code>을 내려받고,
+      CDN에서 Chart.js를 불러온 뒤, 파일 안에 박혀 있던 <code style="font-family:var(--font-mono)">DATA</code> 값을 읽어
+      통계 카드·차트·표를 자바스크립트로 직접 그려 넣습니다. 서버에 데이터를 요청하는 과정이 없습니다.
+    </p>
+  </section>
+
+  <section>
+    <h2>파일 안에는 무엇이 들어있나</h2>
+    <p class="section-sub">이름을 눌러 펼치면 각 파일 내부가 어떤 순서·구조로 짜여 있는지 보입니다.</p>
+    <div class="filelist">
+
+      <details class="filecard web" open>
+        <summary>
+          <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2,0 L8,5 L2,10 z" fill="currentColor"/></svg>
+          <span class="fname">index.html</span>
+          <span class="fdesc">HTML + CSS + JS + 데이터가 전부 이 한 파일 안에</span>
+        </summary>
+        <div class="fbody"><div class="fbody-inner">
+          <ul class="outline">
+            <li><span class="tag">&lt;head&gt;</span><span class="otxt">메타 태그, 페이지 제목, Chart.js를 CDN에서 불러오는 &lt;script&gt; 태그</span></li>
+            <li><span class="tag">&lt;style&gt;</span><span class="otxt">:root에 색상·간격을 변수로 정의하고, 카드·표·차트 레이아웃을 꾸미는 CSS</span></li>
+            <li>
+              <span class="tag">&lt;body&gt;</span><span class="otxt">화면에 실제로 보이는 구조</span>
+              <ul class="nested">
+                <li><span class="otxt"><span class="tag">header</span>대시보드 제목과 부제</span></li>
+                <li><span class="otxt"><span class="tag">.disclaimer</span>상관관계·컴플라이언스 고지문</span></li>
+                <li><span class="otxt"><span class="tag">#statsGrid</span>전체 현황 통계 카드 8개 — 내용은 비어 있고 아래 스크립트가 채움</span></li>
+                <li><span class="otxt"><span class="tag">select + canvas</span>제품 필터 드롭다운, 상세 지표, Chart.js 막대그래프가 그려질 자리</span></li>
+                <li><span class="otxt"><span class="tag">table#topTableBody</span>고액 지급 의사 Top 30 표 — 역시 빈 뼈대만 있음</span></li>
+                <li><span class="otxt"><span class="tag">footer</span>데이터 출처 문구</span></li>
+              </ul>
+            </li>
+            <li><span class="tag">&lt;script&gt;</span><span class="otxt">맨 아래, 실제로 화면을 채우는 자바스크립트 — 5단계로 실행됨 (아래 실제 코드)</span></li>
+          </ul>
+
+          <div class="codesteps">
+            <div>
+              <div class="codestep-label"><span class="step">1</span>aggregate.py가 출력한 JSON을 그대로 붙여넣은 자리. 이 줄 하나가 이 파일에서 가장 깁니다.</div>
+              <pre class="code"><code>const DATA = {"overall": {"op_rows": 36565, "op_unique_npi": 7292, ...},
+  "products": [{"product": "COSENTYX", "total_payment": 267748.18, ...}, ...],
+  "top_physicians": [{"covered_recipient_npi": 1093852253.0, ...}, ...]};</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">2</span>숫자를 "$1,234" 같은 형태로 바꿔주는 헬퍼 함수 두 개.</div>
+              <pre class="code"><code>function fmtUSD(n){
+  if(n===null||n===undefined) return '—';
+  return '$' + Number(n).toLocaleString('en-US',{maximumFractionDigits:0});
+}
+function fmtNum(n){
+  if(n===null||n===undefined) return '—';
+  return Number(n).toLocaleString('en-US');
+}</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">3</span>DATA.overall의 숫자들로 카드 8개를 만들어 #statsGrid에 통째로 삽입.</div>
+              <pre class="code"><code>const o = DATA.overall;
+const statCards = [
+  {label:'Open Payments 레코드', value: fmtNum(o.op_rows), sub: o.op_unique_npi + '명 (고유 NPI)'},
+  {label:'지급액 총합', value: fmtUSD(o.op_total_payment), sub: '...'},
+  // ...총 8개
+];
+document.getElementById('statsGrid').innerHTML = statCards.map(c => `
+  &lt;div class="stat-card"&gt;
+    &lt;div class="label"&gt;${c.label}&lt;/div&gt;
+    &lt;div class="value"&gt;${c.value}&lt;/div&gt;
+  &lt;/div&gt;`).join('');</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">4</span>제품 필터 옵션을 만들고, 선택이 바뀔 때마다 상세 카드와 Chart.js 그래프를 다시 그림.</div>
+              <pre class="code"><code>DATA.products.forEach(p => {
+  const opt = document.createElement('option');
+  opt.value = p.product;
+  opt.textContent = p.product + (p.index_vs_avg!==null ? ' (처방 연계)' : '');
+  select.appendChild(opt);
+});
+
+function renderProduct(productName){
+  const p = DATA.products.find(x => x.product === productName);
+  // ... 상세 지표 채우기
+  chart = new Chart(ctx, { type:'bar', data:{ labels, datasets:[...] } });
+}
+select.addEventListener('change', e => renderProduct(e.target.value));
+renderProduct(DATA.products[0].product);  // 처음엔 첫 제품으로 자동 렌더</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">5</span>Top 30 의사 배열을 한 줄씩 표 행(&lt;tr&gt;)으로 바꿔 표에 삽입.</div>
+              <pre class="code"><code>const tbody = document.getElementById('topTableBody');
+tbody.innerHTML = DATA.top_physicians.map((ph, i) => `
+  &lt;tr&gt;
+    &lt;td&gt;${i+1}&lt;/td&gt;
+    &lt;td&gt;${ph.recipient_first_name} ${ph.recipient_last_name}&lt;/td&gt;
+    &lt;td class="num"&gt;${fmtUSD(ph.total_payment)}&lt;/td&gt;
+    &lt;td&gt;${ph.has_prescribing_data ? '연계됨' : '연계 없음'}&lt;/td&gt;
+  &lt;/tr&gt;`).join('');</code></pre>
+            </div>
+          </div>
+        </div></div>
+      </details>
+
+      <details class="filecard data">
+        <summary>
+          <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2,0 L8,5 L2,10 z" fill="currentColor"/></svg>
+          <span class="fname">aggregate.py</span>
+          <span class="fdesc">CSV 두 개를 pandas로 조인·집계하는 스크립트</span>
+        </summary>
+        <div class="fbody"><div class="fbody-inner">
+          <ul class="outline">
+            <li><span class="tag">import</span><span class="otxt">pandas, json, sys</span></li>
+            <li><span class="tag">TOP_N = 30</span><span class="otxt">Top 몇 명을 뽑을지 정하는 상수</span></li>
+            <li><span class="tag">base_brand()</span><span class="otxt">Part D의 Brnd_Name(펜/시린지 등 제형 표기 포함)을 COSENTYX·ENTRESTO·LUCENTIS 3개로 정리하는 함수</span></li>
+            <li><span class="tag">main()</span><span class="otxt">스크립트의 핵심 — 아래 순서대로 실행됨 (실제 코드)</span></li>
+          </ul>
+
+          <div class="codesteps">
+            <div>
+              <div class="codestep-label"><span class="step">1</span>두 CSV를 pandas로 읽기.</div>
+              <pre class="code"><code>op = pd.read_csv(op_path)
+pdd = pd.read_csv(pd_path)</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">2</span>제조사명 대소문자를 통일 (mfr_norm). "NOVARTIS..."와 "Novartis..."가 따로 집계되는 걸 막음.</div>
+              <pre class="code"><code>op["mfr_norm"] = op["payment_manufacturer"].str.strip()
+op.loc[
+    op["mfr_norm"].str.upper() == "NOVARTIS PHARMACEUTICALS CORPORATION",
+    "mfr_norm",
+] = "Novartis Pharmaceuticals Corporation"</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">3</span>base_brand() 적용, 두 데이터셋에 공통으로 있는 NPI(교집합) 계산.</div>
+              <pre class="code"><code>pdd["base_brand"] = pdd["Brnd_Name"].apply(base_brand)
+overlap_npi = set(op["covered_recipient_npi"]) & set(pdd["Prscrbr_NPI"])</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">4</span>전체 현황 통계(overall) 딕셔너리 생성 — 화면 상단 통계 카드 8개의 원재료.</div>
+              <pre class="code"><code>overall = {
+    "op_rows": int(len(op)),
+    "op_unique_npi": int(op["covered_recipient_npi"].nunique()),
+    "op_total_payment": round(float(op["payment_amount_usd"].sum()), 2),
+    "overlap_npi": len(overlap_npi),
+    # ... 그 외 8개 항목
+}</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">5</span>제품별 groupby → 지급·처방 합치기(merge) → 표준화 지수 계산.</div>
+              <pre class="code"><code>prod_pay = op.groupby("product_1").agg(
+    total_payment=("payment_amount_usd", "sum"), ...
+).reset_index().rename(columns={"product_1": "product"})
+
+prod_presc = pdd.groupby("base_brand").agg(
+    total_drug_cost=("Tot_Drug_Cst", "sum"), ...
+).reset_index().rename(columns={"base_brand": "product"})
+
+merged = prod_pay.merge(prod_presc, on="product", how="left")
+avg_ratio = have_both["total_drug_cost"].sum() / have_both["total_payment"].sum()
+merged["index_vs_avg"] = (merged["total_drug_cost"] / merged["total_payment"]) / avg_ratio</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">6</span>의사별 groupby → 처방 연계 여부(has_prescribing_data) 표시 → 지급액 기준 Top 30 추출.</div>
+              <pre class="code"><code>phys = op.groupby([...]).agg(
+    total_payment=("payment_amount_usd", "sum"),
+    payment_count=("payment_amount_usd", "count"),
+).reset_index()
+phys["has_prescribing_data"] = phys["covered_recipient_npi"].isin(overlap_npi)
+top = phys.sort_values("total_payment", ascending=False).head(TOP_N)</code></pre>
+            </div>
+            <div>
+              <div class="codestep-label"><span class="step">7</span>overall·products·top_physicians 세 덩어리를 json.dumps()로 합쳐 터미널(표준출력)에 출력.</div>
+              <pre class="code"><code>out = {"overall": overall, "products": products, "top_physicians": top_list}
+print(json.dumps(out, ensure_ascii=False))</code></pre>
+            </div>
+          </div>
+        </div></div>
+      </details>
+
+      <details class="filecard">
+        <summary>
+          <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2,0 L8,5 L2,10 z" fill="currentColor"/></svg>
+          <span class="fname">README.md</span>
+          <span class="fdesc">사람이 읽는 안내 문서</span>
+        </summary>
+        <div class="fbody"><div class="fbody-inner">
+          <p class="codestep-label" style="margin-bottom:6px;">실제 제목 구조 그대로:</p>
+          <ul class="headtree">
+            <li class="h2"># 지급-처방 상관관계 분석 대시보드</li>
+            <li class="h3">## 구성</li>
+            <li class="h3">## GitHub Pages 배포 절차</li>
+            <li class="h3">## 데이터 갱신</li>
+          </ul>
+          <div class="codestep-label" style="margin-top:14px;"><span class="step">•</span>"배포 절차" 안에 실제로 적혀 있는 명령어 5줄 — 저희가 이번에 실행한 것과 같은 내용입니다.</div>
+          <pre class="code"><code>git init
+git add index.html README.md
+git commit -m "Add payment-prescription dashboard"
+git branch -M main
+git remote add origin https://github.com/&lt;사용자명&gt;/&lt;저장소명&gt;.git
+git push -u origin main</code></pre>
+        </div></div>
+      </details>
+
+      <details class="filecard">
+        <summary>
+          <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2,0 L8,5 L2,10 z" fill="currentColor"/></svg>
+          <span class="fname">CLAUDE.md</span>
+          <span class="fdesc">AI 어시스턴트가 참고하는 작업 가이드</span>
+        </summary>
+        <div class="fbody"><div class="fbody-inner">
+          <p class="codestep-label" style="margin-bottom:6px;">실제 제목 구조 그대로:</p>
+          <ul class="headtree">
+            <li class="h2"># CLAUDE.md</li>
+            <li class="h3">## 이 프로젝트는 무엇인가</li>
+            <li class="h3">## 아키텍처</li>
+            <li class="h3">## aggregate.py 수정 시 지켜야 할 핵심 도메인 로직</li>
+            <li class="h3">## 컴플라이언스/프레이밍 제약사항</li>
+          </ul>
+          <p class="section-sub" style="margin:12px 0 0;">
+            "핵심 도메인 로직" 절에 실제로 이렇게 적혀 있습니다 — 제조사명 정규화, 브랜드 정규화, 지수 계산,
+            NPI 조인이 의도적으로 부분적이라는 점. 방금 위에서 본 aggregate.py 코드 7단계 중 2·3·5번이 바로 이 규칙들입니다.
+          </p>
+        </div></div>
+      </details>
+
+      <details class="filecard">
+        <summary>
+          <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2,0 L8,5 L2,10 z" fill="currentColor"/></svg>
+          <span class="fname">PRD_지급처방_대시보드.md</span>
+          <span class="fdesc">왜 이렇게 설계했는지의 기획 배경</span>
+        </summary>
+        <div class="fbody"><div class="fbody-inner">
+          <p class="codestep-label" style="margin-bottom:6px;">실제 목차 그대로 (숫자는 실제 장 번호):</p>
+          <ul class="headtree">
+            <li class="h2">1. 개요</li>
+            <li class="h2">2. 배경 및 데이터 현황</li>
+            <li class="h3">2.1 데이터 소스 개요</li>
+            <li class="h3">2.2 NPI 조인 커버리지</li>
+            <li class="h3">2.3 데이터 정합성 검토 결과</li>
+            <li class="h2">3. 목표 및 성공 기준</li>
+            <li class="h2">4. 대상 사용자 및 사용 시나리오</li>
+            <li class="h2">5. 데이터 요구사항</li>
+            <li class="h3">5.1 조인 전략</li>
+            <li class="h3">5.2 데이터 정제 요구사항</li>
+            <li class="h3">5.3 데이터 갱신</li>
+            <li class="h2">6. 기능 요구사항</li>
+            <li class="h3">6.1 핵심 지표(KPI)</li>
+            <li class="h3">6.2 필터</li>
+            <li class="h3">6.3 화면 구성</li>
+            <li class="h2">7. 비기능 요구사항</li>
+            <li class="h2">8. 제약사항 및 리스크</li>
+            <li class="h2">9. 범위 외 항목</li>
+            <li class="h2">10. 배포</li>
+          </ul>
+        </div></div>
+      </details>
+
+      <details class="filecard">
+        <summary>
+          <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2,0 L8,5 L2,10 z" fill="currentColor"/></svg>
+          <span class="fname">.gitignore</span>
+          <span class="fdesc">깃허브에 절대 올리면 안 되는 파일 목록</span>
+        </summary>
+        <div class="fbody"><div class="fbody-inner">
+          <p class="codestep-label" style="margin-bottom:6px;">전체 내용 (6줄짜리라 그대로 다 보여드립니다):</p>
+          <pre class="code"><code># 원본 CSV(민감 데이터 소스)는 저장소에 포함하지 않는다
+*.csv
+
+# OS / 편집기 캐시
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+.vscode/</code></pre>
+        </div></div>
+      </details>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="callout">
+      <h3>그래서 data.js 파일은 왜 없나요?</h3>
+      <p>
+        다른 프로젝트에서는 데이터를 <code style="font-family:var(--font-mono)">data.js</code> 같은 별도 파일로 분리해서
+        <code style="font-family:var(--font-mono)">&lt;script src="data.js"&gt;</code>로 불러오는 방식을 많이 씁니다.
+        이 프로젝트는 그 대신 위 다이어그램의 파란 박스(<code style="font-family:var(--font-mono)">const DATA = {…}</code>)처럼
+        <strong>index.html 안에 데이터를 그대로 박아 넣는</strong> 방식을 택했습니다 — 파일 하나만 있으면
+        어디서든 그대로 열리게 하려는 의도적인 선택입니다.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th></th><th>지금 (인라인)</th><th>data.js로 분리</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>파일 더블클릭으로 바로 열림</td><td class="cell-yes">가능</td><td class="cell-no">브라우저에 따라 막힘</td></tr>
+            <tr><td>데이터 갱신할 때 손댈 곳</td><td>index.html 1곳</td><td>data.js 1곳</td></tr>
+            <tr><td>git diff 가독성</td><td>코드·데이터가 섞임</td><td>더 깔끔하게 분리됨</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>저장소: <a href="https://github.com/symin0729/Dashboard_projects" target="_blank" rel="noopener">github.com/symin0729/Dashboard_projects</a></span>
+    <span>라이브: <a href="https://symin0729.github.io/Dashboard_projects/" target="_blank" rel="noopener">symin0729.github.io/Dashboard_projects</a></span>
+  </footer>
+
+</div>
+</body>
+</html>
