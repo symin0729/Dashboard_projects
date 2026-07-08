@@ -1,0 +1,9 @@
+# 원본 CSV(민감 데이터 소스)는 저장소에 포함하지 않는다
+*.csv
+
+# OS / 편집기 캐시
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+.vscode/
