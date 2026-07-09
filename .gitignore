@@ -1,6 +1,9 @@
 # 원본 CSV(민감 데이터 소스)는 저장소에 포함하지 않는다
 *.csv
 
+# Supabase 연결 문자열 등 로컬 비밀값
+.env
+
 # OS / 편집기 캐시
 .DS_Store
 Thumbs.db

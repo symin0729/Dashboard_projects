@@ -26,4 +26,25 @@ git push -u origin main
 
 ## 데이터 갱신
 
-CSV가 교체되면 집계 스크립트(`aggregate.py`)를 다시 실행하여 `index.html` 내 `const DATA = {...}` 블록을 새 집계 결과로 교체한 뒤 재배포한다. 자동화 파이프라인은 이번 범위에 포함하지 않는다(PRD 5.3절 참조).
+원본 데이터는 Supabase(관리형 Postgres)에 `open_payments`, `part_d_prescriber` 테이블로 보관한다.
+
+테이블 스키마는 [supabase/schema.sql](supabase/schema.sql)에 정의되어 있다(단일 원천).
+
+1. (최초 1회, 또는 스키마 변경 시) 스키마를 적용한다.
+   ```
+   SUPABASE_DB_URL=postgresql://...:5432/postgres python apply_schema.py
+   ```
+2. 새 CSV가 도착하면 테이블 데이터를 교체한다(TRUNCATE 후 append — 스키마 타입 보존).
+   ```
+   SUPABASE_DB_URL=postgresql://...:5432/postgres python load_csv_to_supabase.py open_payments.csv open_payments
+   SUPABASE_DB_URL=postgresql://...:5432/postgres python load_csv_to_supabase.py part_d_prescriber.csv part_d_prescriber
+   ```
+3. GitHub 저장소의 Actions 탭에서 "Update dashboard from Supabase" 워크플로를 수동으로 Run한다. `aggregate.py`가 Supabase에서 재집계하고 `update_dashboard.py`가 `index.html`의 `const DATA = {...}` 블록을 갱신·커밋한다(변경이 있을 때만). 몇 분 후 GitHub Pages에 반영된다.
+
+> 대량 적재에는 **세션 풀러(포트 5432)** 연결 문자열을 쓴다. 직접 연결 호스트(`db.<ref>.supabase.co`)는 IPv6 전용이라 IPv4 환경에서 접속되지 않으므로, `...pooler.supabase.com` 형태의 풀러 문자열을 사용한다.
+
+트리거는 의도적으로 사람이 누르는 버튼(`workflow_dispatch`)이다 — 스케줄 기반 자동 실행이나 실시간 연동은 이번 범위에 포함하지 않는다(PRD 5.3절 참조).
+
+최초 설정 시 필요한 것:
+- Supabase 프로젝트의 Connection string(Settings → Database, URI 형식)을 로컬 환경변수 `SUPABASE_DB_URL`로 설정.
+- 같은 값을 저장소 Settings → Secrets and variables → Actions에 `SUPABASE_DB_URL` 시크릿으로 등록.

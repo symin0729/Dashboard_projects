@@ -1,16 +1,20 @@
 """
 지급-처방 상관관계 대시보드용 데이터 집계 스크립트.
 
-open_payments.csv, part_d_prescriber.csv를 pandas로 정식 파싱하여
+Supabase(Postgres)의 open_payments, part_d_prescriber 테이블을 읽어
 제품별 요약과 고액 지급 의사 Top N을 JSON으로 출력한다.
-출력된 JSON은 index.html의 `const DATA = {...}` 블록에 수동으로 삽입한다.
+출력된 JSON은 update_dashboard.py가 index.html의 `const DATA = {...}` 블록에 삽입한다.
+
+연결 문자열은 환경변수 SUPABASE_DB_URL에서 읽는다.
 
 사용법:
-    python aggregate.py open_payments.csv part_d_prescriber.csv > dashboard_data.json
+    SUPABASE_DB_URL=postgresql://... python aggregate.py > dashboard_data.json
 """
+import os
 import sys
 import json
 import pandas as pd
+from sqlalchemy import create_engine
 
 TOP_N = 30
 
@@ -28,10 +32,7 @@ def base_brand(name):
     return name.upper()
 
 
-def main(op_path, pd_path):
-    op = pd.read_csv(op_path)
-    pdd = pd.read_csv(pd_path)
-
+def build_dashboard_data(op, pdd):
     # 제조사명 대소문자 정규화 (콤마 포함 정식 법인명은 그대로 유지)
     op["mfr_norm"] = op["payment_manufacturer"].str.strip()
     op.loc[
@@ -115,14 +116,30 @@ def main(op_path, pd_path):
     )
     phys["products"] = phys["covered_recipient_npi"].map(prods_by_npi)
     top = phys.sort_values("total_payment", ascending=False).head(TOP_N).round(2)
+    # NPI는 식별자이므로 정수로 출력한다(소수점 표기 방지).
+    top["covered_recipient_npi"] = top["covered_recipient_npi"].astype("Int64")
     top_list = json.loads(top.to_json(orient="records"))
 
-    out = {"overall": overall, "products": products, "top_physicians": top_list}
+    return {"overall": overall, "products": products, "top_physicians": top_list}
+
+
+def load_from_supabase():
+    db_url = os.environ.get("SUPABASE_DB_URL")
+    if not db_url:
+        print("error: SUPABASE_DB_URL 환경변수가 설정되지 않았습니다.", file=sys.stderr)
+        sys.exit(1)
+
+    engine = create_engine(db_url)
+    op = pd.read_sql_table("open_payments", engine)
+    pdd = pd.read_sql_table("part_d_prescriber", engine)
+    return op, pdd
+
+
+def main():
+    op, pdd = load_from_supabase()
+    out = build_dashboard_data(op, pdd)
     print(json.dumps(out, ensure_ascii=False))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("usage: python aggregate.py <open_payments.csv> <part_d_prescriber.csv>", file=sys.stderr)
-        sys.exit(1)
-    main(sys.argv[1], sys.argv[2])
+    main()
