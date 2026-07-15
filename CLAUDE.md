@@ -12,6 +12,10 @@ Novartis Open Payments(제조사가 의료인에게 지급한 내역)와 CMS Med
 
 원본 데이터는 Supabase에 `open_payments`, `part_d_prescriber` 두 테이블로 보관한다. 프론트엔드는 여전히 완전한 정적 페이지이며 Supabase를 직접 호출하지 않는다 — 갱신 시점에만 아래 스크립트들이 Supabase에 접근해 JSON을 재생성한다.
 
+아래 Python 스크립트를 실행하기 전 의존성을 설치한다: `pip install -r requirements.txt`(pandas, sqlalchemy, psycopg2-binary). 테스트 스위트·린터·빌드 단계는 없다.
+
+**셸 주의(PowerShell)**: 이 저장소의 기본 셸은 Windows PowerShell이라 문서 전반의 `SUPABASE_DB_URL=... python ...`(bash 인라인 환경변수) 구문이 동작하지 않는다. PowerShell에서는 `$env:SUPABASE_DB_URL = 'postgresql://...'`로 먼저 설정한 뒤 `python ...`을 실행한다. bash 도구를 쓸 때만 인라인 구문을 그대로 쓸 수 있다.
+
 - **[supabase/schema.sql](supabase/schema.sql)** — 두 테이블의 스키마 단일 원천. 컬럼 타입은 실제 CSV 값을 검사해 확정했다(NPI=`bigint`, 금액=`double precision`, 억제 플래그=`text` 등). Part D 컬럼명은 CamelCase라 반드시 큰따옴표로 감싼다 — 안 그러면 Postgres가 소문자로 접어 `to_sql`과 어긋난다. 타입 변경은 이 파일에서만 한다.
 - **[apply_schema.py](apply_schema.py)** — `supabase/schema.sql`을 Supabase에 적용한다(`create table if not exists`). 최초 1회 및 스키마 변경 시 실행.
 - **[load_csv_to_supabase.py](load_csv_to_supabase.py)** — CSV 한 개를 스키마로 미리 만든 테이블에 **TRUNCATE 후 append**로 적재한다(명시적 타입 보존). 스키마가 없으면 명확한 에러로 안내한다. 대량 적재에는 세션 풀러(포트 5432) 연결 문자열을 권장한다(트랜잭션 풀러 6543은 대량 insert에서 문제 소지).
@@ -22,6 +26,7 @@ Novartis Open Payments(제조사가 의료인에게 지급한 내역)와 CMS Med
 - **[aggregate.py](aggregate.py)** — Supabase의 두 테이블을 `pandas.read_sql_table`로 읽어 조인/집계한 뒤 단일 JSON 블롭을 stdout으로 출력한다(`SUPABASE_DB_URL` 환경변수 필요). 집계 로직 자체(브랜드 정규화, 지수 계산 등)는 CSV 시절과 동일하다.
 - **[update_dashboard.py](update_dashboard.py)** — `aggregate.py`의 집계 결과로 `index.html`의 `const DATA = {...}` 줄을 정규식으로 교체한다. 로컬 실행과 GitHub Actions에서 공통으로 사용한다.
 - **[index.html](index.html)** — 자체 완결형 페이지(인라인 `<style>`, `<script>`, CDN의 Chart.js). 통계 카드, 제품 필터/차트, 고액 지급 의사 테이블 등 모든 렌더링은 `DATA`를 기반으로 한 순수 DOM 조작이다 — 빌드 도구나 설치할 의존성이 없다.
+- **[architecture.html](architecture.html)** — 데이터 → 웹 → 라이브 파이프라인을 비개발자에게 설명하는 독립 실행형 안내 문서(대시보드 자체와는 별개). `index.html`의 데이터 흐름을 바꿨다면 이 문서의 설명도 함께 맞춰야 한다.
 - **[.github/workflows/update-dashboard.yml](.github/workflows/update-dashboard.yml)** — `workflow_dispatch`(수동 버튼) 트리거. `update_dashboard.py`를 실행해 `index.html`을 재생성하고, 변경이 있으면 커밋·푸시한다. `SUPABASE_DB_URL`은 저장소의 Actions 시크릿으로 등록해야 한다.
 
 **데이터 갱신 절차**: ① (최초 1회 또는 스키마 변경 시) `python apply_schema.py`로 스키마 적용. ② 새 CSV로 `load_csv_to_supabase.py`를 실행해 Supabase 테이블 데이터를 교체한다. ③ GitHub 저장소의 Actions 탭에서 "Update dashboard from Supabase" 워크플로를 수동으로 Run한다. 트리거는 의도적으로 사람이 누르는 버튼이다(PRD 5.3절 참조) — 스케줄이나 실시간 연동은 하지 않는다.
