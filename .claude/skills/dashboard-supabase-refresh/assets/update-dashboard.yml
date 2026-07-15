@@ -1,0 +1,47 @@
+# .github/workflows/update-dashboard.yml
+#
+# 수동 버튼(workflow_dispatch)으로 Supabase에서 대시보드를 재생성한다.
+# SUPABASE_DB_URL은 저장소의 Actions 시크릿으로 등록해야 한다
+# (Settings → Secrets and variables → Actions).
+#
+# 주의: 이 파일을 git push하려면 OAuth 토큰에 'workflow' 스코프가 필요하다.
+# 스코프가 없어 push가 거부되면, 이 파일은 GitHub 웹 UI(Add file → Create new file)로
+# 추가한다 — 웹 UI에는 그 제한이 없다.
+
+name: Update dashboard from Supabase
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Regenerate index.html from Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python update_dashboard.py
+
+      - name: Commit and push if index.html changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- index.html; then
+            echo "No data changes, nothing to commit."
+          else
+            git add index.html
+            git commit -m "Update dashboard data from Supabase"
+            git push
+          fi
